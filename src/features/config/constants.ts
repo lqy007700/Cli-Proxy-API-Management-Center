@@ -72,7 +72,15 @@ export const COMMON_FIELD_IDS = [
 export const SECTION_VALIDATION_FIELDS: Record<VisualSectionId, readonly VisualConfigFieldPath[]> =
   {
     connectivity: ['port'],
-    network: ['requestRetry', 'maxRetryCredentials', 'maxRetryInterval', 'authAutoRefreshWorkers'],
+    network: [
+      'requestRetry',
+      'maxRetryCredentials',
+      'maxRetryInterval',
+      'authAutoRefreshWorkers',
+      'accountConcurrencyMaxTotalWait',
+      'accountConcurrencyMaxAccountSwitches',
+      'accountConcurrencyMaxTotalWaiters',
+    ],
     logging: ['errorLogsMaxFiles', 'logsMaxTotalSizeMb', 'redisUsageQueueRetentionSeconds'],
     quota: [],
     streaming: [
@@ -86,7 +94,7 @@ export const SECTION_VALIDATION_FIELDS: Record<VisualSectionId, readonly VisualC
 
 /**
  * fieldId → useVisualConfig dirtyFields 的键（= VisualConfigValues 叶值键，streaming 用点号叶）。
- * 与搜索索引 59 条一一对应；三方对账由 tests/configFieldParity.test.ts 守护 ——
+ * 与搜索索引一一对应；三方对账由 tests/configFieldParity.test.ts 守护 ——
  * 增删字段时漏改任何一边（索引 / 本表 / 分区 JSX）都会红。
  */
 export const FIELD_VALUE_KEYS: Record<string, readonly string[]> = {
@@ -113,6 +121,12 @@ export const FIELD_VALUE_KEYS: Record<string, readonly string[]> = {
   disableImageGeneration: ['disableImageGeneration'],
   gptImage2BaseModel: ['gptImage2BaseModel'],
   routingSessionAffinityTTL: ['routingSessionAffinityTTL'],
+  routingSessionAffinityCapacityPolicy: ['routingSessionAffinityCapacityPolicy'],
+  accountConcurrencyEnabled: ['accountConcurrencyEnabled'],
+  accountConcurrencyMaxTotalWait: ['accountConcurrencyMaxTotalWait'],
+  accountConcurrencyMaxAccountSwitches: ['accountConcurrencyMaxAccountSwitches'],
+  accountConcurrencyMaxTotalWaiters: ['accountConcurrencyMaxTotalWaiters'],
+  accountConcurrencyStore: ['accountConcurrencyStore'],
   forceModelPrefix: ['forceModelPrefix'],
   passthroughHeaders: ['passthroughHeaders'],
   disableCooling: ['disableCooling'],

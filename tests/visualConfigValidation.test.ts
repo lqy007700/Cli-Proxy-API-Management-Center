@@ -197,4 +197,72 @@ streaming:
     values.redisUsageQueueRetentionSeconds = '3600';
     expect(getVisualConfigValidationErrors(values).redisUsageQueueRetentionSeconds).toBeUndefined();
   });
+
+  test('loads and serializes account concurrency settings without flattening YAML', () => {
+    const yaml = `routing:
+  session-affinity-capacity-policy: wait-then-switch
+account-concurrency:
+  enabled: true
+  max-total-wait: 750ms
+  max-account-switches: 0
+  max-total-waiters: 12
+  store: memory
+`;
+    const loaded = runVisualConfig(yaml);
+    expect(loaded.visualValues).toMatchObject({
+      routingSessionAffinityCapacityPolicy: 'wait-then-switch',
+      accountConcurrencyEnabled: true,
+      accountConcurrencyMaxTotalWait: '750ms',
+      accountConcurrencyMaxAccountSwitches: '0',
+      accountConcurrencyMaxTotalWaiters: '12',
+      accountConcurrencyStore: 'memory',
+    });
+
+    const edited = runVisualConfig(yaml, [
+      {
+        accountConcurrencyEnabled: false,
+        accountConcurrencyMaxTotalWaiters: '100',
+      },
+    ]);
+    expect(parseYaml(edited.applyVisualChangesToYaml(yaml))).toEqual({
+      routing: { 'session-affinity-capacity-policy': 'wait-then-switch' },
+      'account-concurrency': {
+        enabled: false,
+        'max-total-wait': '750ms',
+        'max-account-switches': 0,
+        'max-total-waiters': 100,
+        store: 'memory',
+      },
+    });
+  });
+
+  test('validates global account concurrency bounds', () => {
+    const values = structuredClone(DEFAULT_VISUAL_VALUES);
+    values.accountConcurrencyMaxAccountSwitches = '101';
+    expect(getVisualConfigValidationErrors(values).accountConcurrencyMaxAccountSwitches).toBe(
+      'account_concurrency_range'
+    );
+    values.accountConcurrencyMaxAccountSwitches = '2';
+    values.accountConcurrencyMaxTotalWaiters = '0';
+    expect(getVisualConfigValidationErrors(values).accountConcurrencyMaxTotalWaiters).toBe(
+      'account_concurrency_range'
+    );
+  });
+
+  test.each(['100ms', '1s500ms', '5m'])('accepts backend duration %s', (value) => {
+    const values = structuredClone(DEFAULT_VISUAL_VALUES);
+    values.accountConcurrencyMaxTotalWait = value;
+    expect(getVisualConfigValidationErrors(values).accountConcurrencyMaxTotalWait).toBeUndefined();
+  });
+
+  test.each(['', '99ms', '300001ms', 'not-a-duration', '1h'])(
+    'rejects invalid account concurrency duration %s',
+    (value) => {
+      const values = structuredClone(DEFAULT_VISUAL_VALUES);
+      values.accountConcurrencyMaxTotalWait = value;
+      expect(getVisualConfigValidationErrors(values).accountConcurrencyMaxTotalWait).toBe(
+        'account_concurrency_duration'
+      );
+    }
+  );
 });

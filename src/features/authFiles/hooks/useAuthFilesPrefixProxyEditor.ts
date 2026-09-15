@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { authFilesApi, type AuthFileFieldsPatch } from '@/services/api';
 import type { AuthFileItem } from '@/types';
 import { useNotificationStore } from '@/stores';
+import type { AccountConcurrencySnapshot } from '@/types/authFile';
 import {
   applyAuthFileWebsockets,
   applyAuthFileUsingApi,
@@ -20,6 +21,13 @@ import {
   validateCredentialWeightText,
   type CredentialWeightError,
 } from '@/utils/credentialWeight';
+import {
+  isAccountConcurrencyEligible,
+  readAccountConcurrencyConfig,
+  validateAccountConcurrency,
+  type AccountConcurrencyConfig,
+  type AccountConcurrencyValidationError,
+} from '@/features/authFiles/accountConcurrency';
 
 type AuthFileHeaders = Record<string, string>;
 type AuthFileHeadersErrorKey =
@@ -29,7 +37,9 @@ type AuthFileHeadersErrorKey =
 type AuthFileContentErrorKey =
   'auth_files.prefix_proxy_invalid_json' | 'auth_files.prefix_proxy_html_challenge';
 type AuthFileWeightErrorKey = 'auth_files.weight_invalid_integer' | 'auth_files.weight_invalid_max';
-type AuthFileEditorErrorKey = AuthFileHeadersErrorKey | AuthFileWeightErrorKey;
+type AuthFileAccountConcurrencyErrorKey = 'auth_files.account_concurrency_invalid';
+type AuthFileEditorErrorKey =
+  AuthFileHeadersErrorKey | AuthFileWeightErrorKey | AuthFileAccountConcurrencyErrorKey;
 
 export type PrefixProxyEditorField =
   | 'prefix'
@@ -39,6 +49,9 @@ export type PrefixProxyEditorField =
   | 'disableCooling'
   | 'websockets'
   | 'usingApi'
+  | 'maxConcurrency'
+  | 'maxWaiting'
+  | 'waitTimeoutMs'
   | 'note'
   | 'excludedModelsText'
   | 'headersText';
@@ -67,6 +80,13 @@ export type PrefixProxyEditorState = {
   websocketsTouched: boolean;
   usingApi: boolean;
   usingApiTouched: boolean;
+  accountConcurrencySupported: boolean;
+  accountConcurrencyTouched: boolean;
+  maxConcurrency: string;
+  maxWaiting: string;
+  waitTimeoutMs: string;
+  accountConcurrencyError: string | null;
+  accountConcurrencySnapshot: AccountConcurrencySnapshot | null;
   note: string;
   noteTouched: boolean;
   excludedModelsText: string;
@@ -132,8 +152,25 @@ const parseHeadersText = (
 const credentialWeightErrorKey = (error: CredentialWeightError): AuthFileWeightErrorKey =>
   error === 'max' ? 'auth_files.weight_invalid_max' : 'auth_files.weight_invalid_integer';
 
+const accountConcurrencyErrorKey = (
+  _error: AccountConcurrencyValidationError
+): AuthFileAccountConcurrencyErrorKey => 'auth_files.account_concurrency_invalid';
+
 const normalizeTextField = (value: unknown): string =>
   typeof value === 'string' ? value.trim() : '';
+
+const parseAccountConcurrencyEditorValue = (value: string): number => {
+  const parsed = Number(value.trim());
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : Number.NaN;
+};
+
+const accountConcurrencyConfigFromEditor = (
+  editor: PrefixProxyEditorState
+): AccountConcurrencyConfig => ({
+  maxConcurrency: parseAccountConcurrencyEditorValue(editor.maxConcurrency),
+  maxWaiting: parseAccountConcurrencyEditorValue(editor.maxWaiting),
+  waitTimeoutMs: parseAccountConcurrencyEditorValue(editor.waitTimeoutMs),
+});
 
 const normalizeExcludedModels = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
@@ -361,6 +398,26 @@ export const buildAuthFileFieldsPatch = (
     }
   }
 
+  if (editor.accountConcurrencySupported) {
+    const nextAccountConcurrency = accountConcurrencyConfigFromEditor(editor);
+    const concurrencyError = validateAccountConcurrency(nextAccountConcurrency);
+    if (concurrencyError) {
+      throw new Error(resolveError(accountConcurrencyErrorKey(concurrencyError)));
+    }
+
+    const originalAccountConcurrency = readAccountConcurrencyConfig(original);
+    const accountConcurrencyChanged =
+      nextAccountConcurrency.maxConcurrency !== originalAccountConcurrency.maxConcurrency ||
+      nextAccountConcurrency.maxWaiting !== originalAccountConcurrency.maxWaiting ||
+      nextAccountConcurrency.waitTimeoutMs !== originalAccountConcurrency.waitTimeoutMs;
+    if (accountConcurrencyChanged) {
+      // Send the tuple together. The backend validates the final combination atomically.
+      patch.max_concurrency = nextAccountConcurrency.maxConcurrency;
+      patch.max_waiting = nextAccountConcurrency.maxWaiting;
+      patch.wait_timeout_ms = nextAccountConcurrency.waitTimeoutMs;
+    }
+  }
+
   if (editor.headersTouched) {
     const { value: parsedHeaders, errorKey } = parseHeadersText(editor.headersText);
     if (errorKey) {
@@ -448,6 +505,16 @@ const buildPrefixProxyUpdatedText = (
     next = applyAuthFileUsingApi(next, patch.using_api);
   }
 
+  if (patch.max_concurrency !== undefined) {
+    next.max_concurrency = patch.max_concurrency;
+  }
+  if (patch.max_waiting !== undefined) {
+    next.max_waiting = patch.max_waiting;
+  }
+  if (patch.wait_timeout_ms !== undefined) {
+    next.wait_timeout_ms = patch.wait_timeout_ms;
+  }
+
   return JSON.stringify(next);
 };
 
@@ -462,7 +529,8 @@ export function useAuthFilesPrefixProxyEditor(
 
   const hasBlockingValidationError = Boolean(
     (prefixProxyEditor?.headersTouched && prefixProxyEditor.headersError) ||
-    prefixProxyEditor?.weightError
+    prefixProxyEditor?.weightError ||
+    prefixProxyEditor?.accountConcurrencyError
   );
   const prefixProxyUpdatedText =
     prefixProxyEditor && !hasBlockingValidationError
@@ -512,6 +580,13 @@ export function useAuthFilesPrefixProxyEditor(
       websocketsTouched: false,
       usingApi: false,
       usingApiTouched: false,
+      accountConcurrencySupported: isAccountConcurrencyEligible(file),
+      accountConcurrencyTouched: false,
+      maxConcurrency: '0',
+      maxWaiting: '0',
+      waitTimeoutMs: '0',
+      accountConcurrencyError: null,
+      accountConcurrencySnapshot: file.accountConcurrency ?? null,
       note: '',
       noteTouched: false,
       excludedModelsText: '',
@@ -564,6 +639,11 @@ export function useAuthFilesPrefixProxyEditor(
         ? readAuthFileWebsockets(json)
         : false;
       const usingApi = supportsAuthFileUsingApi(providerKey) ? readAuthFileUsingApi(json) : false;
+      const accountConcurrency = readAccountConcurrencyConfig(json);
+      const accountConcurrencySupported = isAccountConcurrencyEligible({ ...file, ...json });
+      const accountConcurrencyError = accountConcurrencySupported
+        ? validateAccountConcurrency(accountConcurrency)
+        : null;
       const note = typeof json.note === 'string' ? json.note : '';
       const excludedModelsText = readExcludedModels(json).join('\n');
       const headers = json.headers;
@@ -596,6 +676,15 @@ export function useAuthFilesPrefixProxyEditor(
           websocketsTouched: false,
           usingApi,
           usingApiTouched: false,
+          accountConcurrencySupported,
+          accountConcurrencyTouched: false,
+          maxConcurrency: String(accountConcurrency.maxConcurrency),
+          maxWaiting: String(accountConcurrency.maxWaiting),
+          waitTimeoutMs: String(accountConcurrency.waitTimeoutMs),
+          accountConcurrencyError: accountConcurrencyError
+            ? t(accountConcurrencyErrorKey(accountConcurrencyError))
+            : null,
+          accountConcurrencySnapshot: prev.accountConcurrencySnapshot,
           note,
           noteTouched: false,
           excludedModelsText,
@@ -646,6 +735,19 @@ export function useAuthFilesPrefixProxyEditor(
       }
       if (field === 'usingApi') {
         return { ...prev, usingApi: Boolean(value), usingApiTouched: true };
+      }
+      if (field === 'maxConcurrency' || field === 'maxWaiting' || field === 'waitTimeoutMs') {
+        const next = {
+          ...prev,
+          [field]: String(value),
+          accountConcurrencyTouched: true,
+        };
+        const concurrency = accountConcurrencyConfigFromEditor(next);
+        const error = validateAccountConcurrency(concurrency);
+        return {
+          ...next,
+          accountConcurrencyError: error ? t(accountConcurrencyErrorKey(error)) : null,
+        };
       }
       if (field === 'note') return { ...prev, note: String(value), noteTouched: true };
       if (field === 'excludedModelsText') {

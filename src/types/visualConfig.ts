@@ -1,6 +1,7 @@
 export type PayloadParamValueType = 'string' | 'number' | 'boolean' | 'json';
 export type DisableImageGenerationMode = 'false' | 'true' | 'chat' | 'passthrough';
 export type RoutingStrategy = 'round-robin' | 'weighted-round-robin' | 'fill-first';
+export type SessionAffinityCapacityPolicy = 'strict-wait' | 'wait-then-switch';
 export type PluginStoreAuthType = 'none' | 'bearer' | 'basic' | 'header' | 'github-token';
 export type PluginStoreAuthApplyTo = 'registry' | 'metadata' | 'artifact';
 export type PayloadParamValidationErrorCode =
@@ -15,12 +16,20 @@ export type VisualConfigFieldPath =
   | 'maxRetryCredentials'
   | 'maxRetryInterval'
   | 'authAutoRefreshWorkers'
+  | 'accountConcurrencyMaxTotalWait'
+  | 'accountConcurrencyMaxAccountSwitches'
+  | 'accountConcurrencyMaxTotalWaiters'
   | 'streaming.keepaliveSeconds'
   | 'streaming.bootstrapRetries'
   | 'streaming.nonstreamKeepaliveInterval';
 
 export type VisualConfigValidationErrorCode =
-  'port_range' | 'integer' | 'non_negative_integer' | 'integer_range_1_3600';
+  | 'port_range'
+  | 'integer'
+  | 'non_negative_integer'
+  | 'integer_range_1_3600'
+  | 'account_concurrency_range'
+  | 'account_concurrency_duration';
 
 export type VisualConfigValidationErrors = Partial<
   Record<VisualConfigFieldPath, VisualConfigValidationErrorCode>
@@ -121,6 +130,12 @@ export type VisualConfigValues = {
   routingStrategy: RoutingStrategy;
   routingSessionAffinity: boolean;
   routingSessionAffinityTTL: string;
+  routingSessionAffinityCapacityPolicy: SessionAffinityCapacityPolicy;
+  accountConcurrencyEnabled: boolean;
+  accountConcurrencyMaxTotalWait: string;
+  accountConcurrencyMaxAccountSwitches: string;
+  accountConcurrencyMaxTotalWaiters: string;
+  accountConcurrencyStore: string;
   wsAuth: boolean;
   antigravitySensitiveWords: string[];
   devinSensitiveWords: string[];
@@ -187,6 +202,12 @@ export const DEFAULT_VISUAL_VALUES: VisualConfigValues = {
   routingStrategy: 'round-robin',
   routingSessionAffinity: false,
   routingSessionAffinityTTL: '',
+  routingSessionAffinityCapacityPolicy: 'strict-wait',
+  accountConcurrencyEnabled: false,
+  accountConcurrencyMaxTotalWait: '30s',
+  accountConcurrencyMaxAccountSwitches: '2',
+  accountConcurrencyMaxTotalWaiters: '10000',
+  accountConcurrencyStore: 'memory',
   wsAuth: true,
   antigravitySensitiveWords: [],
   devinSensitiveWords: [],

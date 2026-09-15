@@ -27,6 +27,13 @@ const makeEditor = (json: Record<string, unknown>, weight: string): PrefixProxyE
   websocketsTouched: false,
   usingApi: false,
   usingApiTouched: false,
+  accountConcurrencySupported: false,
+  accountConcurrencyTouched: false,
+  maxConcurrency: '0',
+  maxWaiting: '0',
+  waitTimeoutMs: '0',
+  accountConcurrencyError: null,
+  accountConcurrencySnapshot: null,
   note: '',
   noteTouched: false,
   excludedModelsText: '',
@@ -96,9 +103,9 @@ describe('auth-file disable cooling patch', () => {
   });
 
   test('does not patch an untouched or unchanged override', () => {
-    expect(buildAuthFileFieldsPatch(makeEditor({ disable_cooling: true }, ''), resolveError)).toEqual(
-      {}
-    );
+    expect(
+      buildAuthFileFieldsPatch(makeEditor({ disable_cooling: true }, ''), resolveError)
+    ).toEqual({});
     expect(
       buildAuthFileFieldsPatch(
         {
@@ -109,6 +116,44 @@ describe('auth-file disable cooling patch', () => {
         resolveError
       )
     ).toEqual({});
+  });
+});
+
+describe('auth-file account concurrency patch', () => {
+  test('sends the validated concurrency tuple together', () => {
+    const original = {
+      type: 'codex',
+      max_concurrency: 2,
+      max_waiting: 6,
+      wait_timeout_ms: 8000,
+    };
+    const editor = {
+      ...makeEditor(original, ''),
+      accountConcurrencySupported: true,
+      maxConcurrency: '4',
+      maxWaiting: '10',
+      waitTimeoutMs: '12000',
+    };
+
+    expect(buildAuthFileFieldsPatch(editor, resolveError)).toEqual({
+      max_concurrency: 4,
+      max_waiting: 10,
+      wait_timeout_ms: 12000,
+    });
+  });
+
+  test('rejects an invalid tuple before a PATCH can be sent', () => {
+    const editor = {
+      ...makeEditor({ type: 'codex' }, ''),
+      accountConcurrencySupported: true,
+      maxConcurrency: '2',
+      maxWaiting: '1',
+      waitTimeoutMs: '0',
+    };
+
+    expect(() => buildAuthFileFieldsPatch(editor, resolveError)).toThrow(
+      'auth_files.account_concurrency_invalid'
+    );
   });
 });
 

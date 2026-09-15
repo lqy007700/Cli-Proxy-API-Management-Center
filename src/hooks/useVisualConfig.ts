@@ -196,6 +196,48 @@ function getRedisRetentionError(value: string): 'integer_range_1_3600' | undefin
   return parsed >= 1 && parsed <= 3600 ? undefined : 'integer_range_1_3600';
 }
 
+function getAccountConcurrencyRangeError(
+  value: string,
+  minimum: number,
+  maximum: number
+): 'integer' | 'account_concurrency_range' | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (!/^\d+$/.test(trimmed) || !Number.isSafeInteger(Number(trimmed))) return 'integer';
+  const parsed = Number(trimmed);
+  return parsed >= minimum && parsed <= maximum ? undefined : 'account_concurrency_range';
+}
+
+function getAccountConcurrencyDurationError(
+  value: string
+): 'account_concurrency_duration' | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return 'account_concurrency_duration';
+
+  const durationPattern = /(\d+(?:\.\d+)?)(ns|us|µs|ms|s|m|h)/g;
+  const unitMilliseconds: Record<string, number> = {
+    ns: 0.000001,
+    us: 0.001,
+    µs: 0.001,
+    ms: 1,
+    s: 1000,
+    m: 60_000,
+    h: 3_600_000,
+  };
+  let consumed = '';
+  let totalMilliseconds = 0;
+  let match: RegExpExecArray | null;
+  while ((match = durationPattern.exec(trimmed)) !== null) {
+    consumed += match[0];
+    const amount = Number(match[1]);
+    totalMilliseconds += amount * (unitMilliseconds[match[2]] ?? Number.NaN);
+  }
+
+  return consumed === trimmed && totalMilliseconds >= 100 && totalMilliseconds <= 300_000
+    ? undefined
+    : 'account_concurrency_duration';
+}
+
 export function getVisualConfigValidationErrors(
   values: VisualConfigValues
 ): VisualConfigValidationErrors {
@@ -208,6 +250,19 @@ export function getVisualConfigValidationErrors(
     maxRetryCredentials: getIntegerError(values.maxRetryCredentials),
     maxRetryInterval: getIntegerError(values.maxRetryInterval),
     authAutoRefreshWorkers: getIntegerError(values.authAutoRefreshWorkers),
+    accountConcurrencyMaxTotalWait: getAccountConcurrencyDurationError(
+      values.accountConcurrencyMaxTotalWait
+    ),
+    accountConcurrencyMaxAccountSwitches: getAccountConcurrencyRangeError(
+      values.accountConcurrencyMaxAccountSwitches,
+      0,
+      100
+    ),
+    accountConcurrencyMaxTotalWaiters: getAccountConcurrencyRangeError(
+      values.accountConcurrencyMaxTotalWaiters,
+      1,
+      100_000
+    ),
     'streaming.keepaliveSeconds': getIntegerError(values.streaming.keepaliveSeconds),
     'streaming.bootstrapRetries': getIntegerError(values.streaming.bootstrapRetries),
     'streaming.nonstreamKeepaliveInterval': getIntegerError(
@@ -1118,6 +1173,12 @@ function getNextDirtyFields(
       'routingStrategy',
       'routingSessionAffinity',
       'routingSessionAffinityTTL',
+      'routingSessionAffinityCapacityPolicy',
+      'accountConcurrencyEnabled',
+      'accountConcurrencyMaxTotalWait',
+      'accountConcurrencyMaxAccountSwitches',
+      'accountConcurrencyMaxTotalWaiters',
+      'accountConcurrencyStore',
     ] as Array<keyof VisualConfigValues>
   ).forEach(updateScalarDirty);
 
@@ -1284,6 +1345,7 @@ export function useVisualConfig() {
       const remoteManagement = asRecord(parsed['remote-management']);
       const quotaExceeded = asRecord(parsed['quota-exceeded']);
       const routing = asRecord(parsed.routing);
+      const accountConcurrency = asRecord(parsed['account-concurrency']);
       const payload = asRecord(parsed.payload);
       const streaming = asRecord(parsed.streaming);
       const plugins = asRecord(parsed.plugins);
@@ -1400,6 +1462,28 @@ export function useVisualConfig() {
               : typeof routing?.['sessionAffinityTTL'] === 'string'
                 ? routing['sessionAffinityTTL']
                 : '',
+        routingSessionAffinityCapacityPolicy:
+          routing?.['session-affinity-capacity-policy'] === 'wait-then-switch'
+            ? 'wait-then-switch'
+            : DEFAULT_VISUAL_VALUES.routingSessionAffinityCapacityPolicy,
+
+        accountConcurrencyEnabled: Boolean(accountConcurrency?.enabled),
+        accountConcurrencyMaxTotalWait:
+          typeof accountConcurrency?.['max-total-wait'] === 'string'
+            ? accountConcurrency['max-total-wait']
+            : DEFAULT_VISUAL_VALUES.accountConcurrencyMaxTotalWait,
+        accountConcurrencyMaxAccountSwitches: String(
+          accountConcurrency?.['max-account-switches'] ??
+            DEFAULT_VISUAL_VALUES.accountConcurrencyMaxAccountSwitches
+        ),
+        accountConcurrencyMaxTotalWaiters: String(
+          accountConcurrency?.['max-total-waiters'] ??
+            DEFAULT_VISUAL_VALUES.accountConcurrencyMaxTotalWaiters
+        ),
+        accountConcurrencyStore:
+          typeof accountConcurrency?.store === 'string'
+            ? accountConcurrency.store
+            : DEFAULT_VISUAL_VALUES.accountConcurrencyStore,
 
         payloadDefaultRules: parsePayloadRules(payload?.default),
         payloadDefaultRawRules: parseRawPayloadRules(payload?.['default-raw']),
@@ -1718,7 +1802,8 @@ export function useVisualConfig() {
         const routingDirty =
           dirtyFields.has('routingStrategy') ||
           dirtyFields.has('routingSessionAffinity') ||
-          dirtyFields.has('routingSessionAffinityTTL');
+          dirtyFields.has('routingSessionAffinityTTL') ||
+          dirtyFields.has('routingSessionAffinityCapacityPolicy');
         if (routingDirty) {
           ensureMapInDoc(doc, ['routing']);
           if (dirtyFields.has('routingStrategy')) {
@@ -1734,7 +1819,56 @@ export function useVisualConfig() {
               values.routingSessionAffinityTTL
             );
           }
+          if (dirtyFields.has('routingSessionAffinityCapacityPolicy')) {
+            setStringInDoc(
+              doc,
+              ['routing', 'session-affinity-capacity-policy'],
+              values.routingSessionAffinityCapacityPolicy
+            );
+          }
           deleteIfMapEmpty(doc, ['routing']);
+        }
+
+        const accountConcurrencyDirty =
+          dirtyFields.has('accountConcurrencyEnabled') ||
+          dirtyFields.has('accountConcurrencyMaxTotalWait') ||
+          dirtyFields.has('accountConcurrencyMaxAccountSwitches') ||
+          dirtyFields.has('accountConcurrencyMaxTotalWaiters') ||
+          dirtyFields.has('accountConcurrencyStore');
+        if (accountConcurrencyDirty) {
+          ensureMapInDoc(doc, ['account-concurrency']);
+          if (dirtyFields.has('accountConcurrencyEnabled')) {
+            setBooleanInDoc(
+              doc,
+              ['account-concurrency', 'enabled'],
+              values.accountConcurrencyEnabled
+            );
+          }
+          if (dirtyFields.has('accountConcurrencyMaxTotalWait')) {
+            setStringInDoc(
+              doc,
+              ['account-concurrency', 'max-total-wait'],
+              values.accountConcurrencyMaxTotalWait
+            );
+          }
+          if (dirtyFields.has('accountConcurrencyMaxAccountSwitches')) {
+            setIntFromStringInDoc(
+              doc,
+              ['account-concurrency', 'max-account-switches'],
+              values.accountConcurrencyMaxAccountSwitches
+            );
+          }
+          if (dirtyFields.has('accountConcurrencyMaxTotalWaiters')) {
+            setIntFromStringInDoc(
+              doc,
+              ['account-concurrency', 'max-total-waiters'],
+              values.accountConcurrencyMaxTotalWaiters
+            );
+          }
+          if (dirtyFields.has('accountConcurrencyStore')) {
+            setStringInDoc(doc, ['account-concurrency', 'store'], values.accountConcurrencyStore);
+          }
+          deleteIfMapEmpty(doc, ['account-concurrency']);
         }
 
         const keepaliveSeconds =

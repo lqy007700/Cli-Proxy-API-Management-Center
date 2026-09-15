@@ -151,6 +151,41 @@
   margin-top: 2px;
 }
 
+/* ---------- 账号并发快照 ---------- */
+
+.concurrency {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 26%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary-color) 7%, transparent);
+  font-family: $font-mono;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.concurrencyLabel {
+  color: var(--text-secondary);
+  font-weight: 650;
+}
+
+.concurrencyActive {
+  color: var(--primary-active);
+  font-weight: 700;
+}
+
+.concurrencyWaiting,
+.concurrencyGlobalWaiting {
+  color: var(--text-tertiary);
+}
+
+.concurrencyGlobalWaiting {
+  color: var(--warning-text);
+}
+
 /* ---------- 健康区：eyebrow + 计数 + 状态条 ---------- */
 
 .health {

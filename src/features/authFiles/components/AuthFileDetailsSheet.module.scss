@@ -88,6 +88,65 @@
   gap: 14px;
 }
 
+.accountConcurrency {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-secondary) 62%, transparent);
+}
+
+.accountConcurrencyHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.accountConcurrencyTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.accountConcurrencyHint {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+.accountConcurrencySnapshot {
+  flex-shrink: 0;
+  padding: 4px 7px;
+  border-radius: $radius-full;
+  background: var(--primary-10);
+  color: var(--primary-active);
+  font-family: $font-mono;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.accountConcurrencyFields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  .accountConcurrencyHeader {
+    flex-direction: column;
+  }
+
+  .accountConcurrencyFields {
+    grid-template-columns: 1fr;
+  }
+}
+
 .settingsLink {
   color: var(--primary-color);
   font-weight: 600;

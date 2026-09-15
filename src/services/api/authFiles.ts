@@ -3,7 +3,7 @@
  */
 
 import { apiClient } from './client';
-import type { AuthFilesResponse } from '@/types/authFile';
+import type { AccountConcurrencySnapshot, AuthFilesResponse } from '@/types/authFile';
 import type { OAuthModelAliasEntry } from '@/types';
 import { normalizeOAuthProviderKey } from '@/utils/providerKeys';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
@@ -30,6 +30,9 @@ export type AuthFileFieldsPatch = {
   websockets?: boolean;
   using_api?: boolean;
   note?: string;
+  max_concurrency?: number;
+  max_waiting?: number;
+  wait_timeout_ms?: number;
   excluded_models?: string[];
   'excluded-models'?: string[];
   expired?: string;
@@ -233,6 +236,36 @@ const readIntegerField = (value: unknown): number | undefined => {
   return Number.isSafeInteger(parsed) ? parsed : undefined;
 };
 
+const readNonNegativeIntegerField = (value: unknown): number | undefined => {
+  const parsed = readIntegerField(value);
+  return parsed !== undefined && parsed >= 0 ? parsed : undefined;
+};
+
+const normalizeAccountConcurrencySnapshot = (
+  value: unknown
+): AccountConcurrencySnapshot | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const active = readNonNegativeIntegerField(record.active);
+  const waiting = readNonNegativeIntegerField(record.waiting);
+  const limit = readNonNegativeIntegerField(record.limit);
+  const globalWaiting = readNonNegativeIntegerField(record.global_waiting);
+  if (
+    active === undefined ||
+    waiting === undefined ||
+    limit === undefined ||
+    globalWaiting === undefined
+  ) {
+    return undefined;
+  }
+  return {
+    active,
+    waiting,
+    limit,
+    global_waiting: globalWaiting,
+  };
+};
+
 const readRuntimeOnlyField = (entry: AuthFileEntry): boolean => {
   const raw = entry['runtime_only'] ?? entry.runtimeOnly;
   if (typeof raw === 'boolean') return raw;
@@ -261,6 +294,10 @@ const normalizeAuthFileEntry = (
   const modified = readDateField(entry);
   const priority = readIntegerField(entry['priority']);
   const weight = readIntegerField(entry['weight']);
+  const maxConcurrency = readNonNegativeIntegerField(entry.max_concurrency);
+  const maxWaiting = readNonNegativeIntegerField(entry.max_waiting);
+  const waitTimeoutMs = readNonNegativeIntegerField(entry.wait_timeout_ms);
+  const accountConcurrency = normalizeAccountConcurrencySnapshot(entry.account_concurrency);
 
   return {
     ...entry,
@@ -274,6 +311,10 @@ const normalizeAuthFileEntry = (
     ...(modified > 0 ? { modified } : {}),
     priority,
     weight,
+    ...(maxConcurrency !== undefined ? { maxConcurrency } : {}),
+    ...(maxWaiting !== undefined ? { maxWaiting } : {}),
+    ...(waitTimeoutMs !== undefined ? { waitTimeoutMs } : {}),
+    ...(accountConcurrency ? { accountConcurrency } : {}),
     ...(note ? { note } : {}),
     ...(email ? { email } : {}),
     ...(projectId ? { projectId } : {}),

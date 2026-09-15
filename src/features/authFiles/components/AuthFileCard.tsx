@@ -105,6 +105,12 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const priorityValue = Number.isSafeInteger(file.priority) ? file.priority : undefined;
   const weightValue = Number.isSafeInteger(file.weight) ? file.weight : undefined;
   const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
+  const accountConcurrency = file.accountConcurrency;
+  const showAccountConcurrency = Boolean(
+    accountConcurrency &&
+    Number.isSafeInteger(accountConcurrency.limit) &&
+    accountConcurrency.limit > 0
+  );
   // 主行显示账号（email/项目 ID），文件名降为满卡宽的 mono 副行
   const identity = deriveAuthFileIdentity(file);
 
@@ -178,6 +184,31 @@ export function AuthFileCard(props: AuthFileCardProps) {
       )}
 
       <AuthFileCooldownSection snapshot={file.cooldownSnapshot} />
+
+      {showAccountConcurrency && accountConcurrency && (
+        <div
+          className={styles.concurrency}
+          title={t('auth_files.account_concurrency_card_hint')}
+          aria-label={t('auth_files.account_concurrency_card_label')}
+        >
+          <span className={styles.concurrencyLabel}>
+            {t('auth_files.account_concurrency_card_label')}
+          </span>
+          <span className={styles.concurrencyActive}>
+            {accountConcurrency.active}/{accountConcurrency.limit}
+          </span>
+          <span className={styles.concurrencyWaiting}>
+            {t('auth_files.account_concurrency_waiting', { count: accountConcurrency.waiting })}
+          </span>
+          {accountConcurrency.global_waiting > 0 && (
+            <span className={styles.concurrencyGlobalWaiting}>
+              {t('auth_files.account_concurrency_global_waiting', {
+                count: accountConcurrency.global_waiting,
+              })}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className={styles.health}>
         <div className={styles.healthHead}>

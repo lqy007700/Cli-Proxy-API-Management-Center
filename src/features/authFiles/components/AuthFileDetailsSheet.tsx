@@ -153,7 +153,8 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
               !dirty ||
               !editor?.json ||
               Boolean(editor?.headersTouched && editor.headersError) ||
-              Boolean(editor?.weightError)
+              Boolean(editor?.weightError) ||
+              Boolean(editor?.accountConcurrencyError)
             }
           >
             {t('common.save')}
@@ -235,6 +236,70 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
                     disabled={disableControls || editor.saving || !editor.json}
                     onChange={(e) => onChange('weight', e.target.value)}
                   />
+                  {editor.accountConcurrencySupported && (
+                    <section
+                      className={styles.accountConcurrency}
+                      aria-labelledby="account-concurrency-title"
+                    >
+                      <div className={styles.accountConcurrencyHeader}>
+                        <div>
+                          <h3
+                            id="account-concurrency-title"
+                            className={styles.accountConcurrencyTitle}
+                          >
+                            {t('auth_files.account_concurrency_label')}
+                          </h3>
+                          <p className={styles.accountConcurrencyHint}>
+                            {t('auth_files.account_concurrency_hint')}
+                          </p>
+                        </div>
+                        {editor.accountConcurrencySnapshot && (
+                          <span className={styles.accountConcurrencySnapshot}>
+                            {t('auth_files.account_concurrency_current', {
+                              active: editor.accountConcurrencySnapshot.active,
+                              limit: editor.accountConcurrencySnapshot.limit,
+                              waiting: editor.accountConcurrencySnapshot.waiting,
+                            })}
+                          </span>
+                        )}
+                      </div>
+                      <div className={styles.accountConcurrencyFields}>
+                        <Input
+                          label={t('auth_files.max_concurrency_label')}
+                          type="number"
+                          min={0}
+                          max={10_000}
+                          step={1}
+                          value={editor.maxConcurrency}
+                          disabled={disableControls || editor.saving || !editor.json}
+                          onChange={(e) => onChange('maxConcurrency', e.target.value)}
+                        />
+                        <Input
+                          label={t('auth_files.max_waiting_label')}
+                          type="number"
+                          min={0}
+                          max={10_000}
+                          step={1}
+                          value={editor.maxWaiting}
+                          disabled={disableControls || editor.saving || !editor.json}
+                          onChange={(e) => onChange('maxWaiting', e.target.value)}
+                        />
+                        <Input
+                          label={t('auth_files.wait_timeout_ms_label')}
+                          type="number"
+                          min={0}
+                          max={300_000}
+                          step={1}
+                          value={editor.waitTimeoutMs}
+                          disabled={disableControls || editor.saving || !editor.json}
+                          onChange={(e) => onChange('waitTimeoutMs', e.target.value)}
+                        />
+                      </div>
+                      {editor.accountConcurrencyError && (
+                        <div className="error-box">{editor.accountConcurrencyError}</div>
+                      )}
+                    </section>
+                  )}
                   <div className="form-group">
                     <label>{t('auth_files.disable_cooling_label')}</label>
                     <ToggleSwitch

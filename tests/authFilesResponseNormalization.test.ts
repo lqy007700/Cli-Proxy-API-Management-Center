@@ -105,4 +105,25 @@ describe('auth-files response normalization', () => {
     expect(result.files[0]?.account).toBe('sk-live-abcd');
     expect(result.files[0]?.accountType).toBeUndefined();
   });
+
+  test('normalizes account concurrency settings and the live snapshot', () => {
+    const result = normalizeAuthFilesResponse(
+      responseWithRawFiles([
+        {
+          name: 'codex-concurrency.json',
+          max_concurrency: 2,
+          max_waiting: 6,
+          wait_timeout_ms: 8000,
+          account_concurrency: { active: 1, waiting: 3, limit: 2, global_waiting: 4 },
+        },
+      ])
+    );
+
+    expect(result.files[0]).toMatchObject({
+      maxConcurrency: 2,
+      maxWaiting: 6,
+      waitTimeoutMs: 8000,
+      accountConcurrency: { active: 1, waiting: 3, limit: 2, global_waiting: 4 },
+    });
+  });
 });

@@ -8,6 +8,7 @@ import type { ConfigSectionProps } from '../../types';
 import { SectionCard } from '../SectionCard';
 import {
   FieldAnchor,
+  FieldGroup,
   FieldGrid,
   FieldShell,
   FieldStack,
@@ -31,6 +32,8 @@ export function SectionNetwork({
   const routingStrategyHintId = `${routingStrategyLabelId}-hint`;
   const disableImageGenerationLabelId = useId();
   const disableImageGenerationHintId = `${disableImageGenerationLabelId}-hint`;
+  const capacityPolicyLabelId = useId();
+  const capacityPolicyHintId = `${capacityPolicyLabelId}-hint`;
 
   const requestRetryError = getValidationMessage(t, validationErrors?.requestRetry);
   const maxRetryCredentialsError = getValidationMessage(t, validationErrors?.maxRetryCredentials);
@@ -38,6 +41,18 @@ export function SectionNetwork({
   const authAutoRefreshWorkersError = getValidationMessage(
     t,
     validationErrors?.authAutoRefreshWorkers
+  );
+  const accountConcurrencyMaxAccountSwitchesError = getValidationMessage(
+    t,
+    validationErrors?.accountConcurrencyMaxAccountSwitches
+  );
+  const accountConcurrencyMaxTotalWaitError = getValidationMessage(
+    t,
+    validationErrors?.accountConcurrencyMaxTotalWait
+  );
+  const accountConcurrencyMaxTotalWaitersError = getValidationMessage(
+    t,
+    validationErrors?.accountConcurrencyMaxTotalWaiters
   );
 
   const disableImageGenerationOptions = [
@@ -199,6 +214,130 @@ export function SectionNetwork({
             />
           </FieldAnchor>
         </FieldGrid>
+
+        <FieldGroup
+          title={t('config_management.visual.sections.network.account_concurrency_title')}
+          description={t(
+            'config_management.visual.sections.network.account_concurrency_description'
+          )}
+        >
+          <FieldGrid>
+            <FieldAnchor fieldId="accountConcurrencyMaxTotalWait">
+              <Input
+                label={t(
+                  'config_management.visual.sections.network.account_concurrency_max_total_wait'
+                )}
+                placeholder="30s"
+                value={values.accountConcurrencyMaxTotalWait}
+                onChange={(e) => onChange({ accountConcurrencyMaxTotalWait: e.target.value })}
+                disabled={disabled}
+                error={accountConcurrencyMaxTotalWaitError}
+                hint={t(
+                  'config_management.visual.sections.network.account_concurrency_max_total_wait_hint'
+                )}
+              />
+            </FieldAnchor>
+            <FieldAnchor fieldId="accountConcurrencyMaxAccountSwitches">
+              <Input
+                label={t(
+                  'config_management.visual.sections.network.account_concurrency_max_account_switches'
+                )}
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={values.accountConcurrencyMaxAccountSwitches}
+                onChange={(e) => onChange({ accountConcurrencyMaxAccountSwitches: e.target.value })}
+                disabled={disabled}
+                hint={t(
+                  'config_management.visual.sections.network.account_concurrency_max_account_switches_hint'
+                )}
+                error={accountConcurrencyMaxAccountSwitchesError}
+              />
+            </FieldAnchor>
+            <FieldAnchor fieldId="accountConcurrencyMaxTotalWaiters">
+              <Input
+                label={t(
+                  'config_management.visual.sections.network.account_concurrency_max_total_waiters'
+                )}
+                type="number"
+                min={1}
+                max={100_000}
+                step={1}
+                value={values.accountConcurrencyMaxTotalWaiters}
+                onChange={(e) => onChange({ accountConcurrencyMaxTotalWaiters: e.target.value })}
+                disabled={disabled}
+                hint={t(
+                  'config_management.visual.sections.network.account_concurrency_max_total_waiters_hint'
+                )}
+                error={accountConcurrencyMaxTotalWaitersError}
+              />
+            </FieldAnchor>
+            <FieldAnchor fieldId="accountConcurrencyStore">
+              <FieldShell
+                label={t('config_management.visual.sections.network.account_concurrency_store')}
+                hint={t('config_management.visual.sections.network.account_concurrency_store_hint')}
+              >
+                <Select
+                  value={values.accountConcurrencyStore}
+                  options={[{ value: 'memory', label: 'memory' }]}
+                  disabled={disabled}
+                  onChange={(accountConcurrencyStore) => onChange({ accountConcurrencyStore })}
+                />
+              </FieldShell>
+            </FieldAnchor>
+            <FieldAnchor fieldId="routingSessionAffinityCapacityPolicy">
+              <FieldShell
+                label={t(
+                  'config_management.visual.sections.network.session_affinity_capacity_policy'
+                )}
+                labelId={capacityPolicyLabelId}
+                hint={t(
+                  'config_management.visual.sections.network.session_affinity_capacity_policy_hint'
+                )}
+                hintId={capacityPolicyHintId}
+              >
+                <Select
+                  value={values.routingSessionAffinityCapacityPolicy}
+                  options={[
+                    {
+                      value: 'strict-wait',
+                      label: t(
+                        'config_management.visual.sections.network.session_affinity_capacity_policy_strict'
+                      ),
+                    },
+                    {
+                      value: 'wait-then-switch',
+                      label: t(
+                        'config_management.visual.sections.network.session_affinity_capacity_policy_switch'
+                      ),
+                    },
+                  ]}
+                  disabled={disabled}
+                  ariaLabelledBy={capacityPolicyLabelId}
+                  ariaDescribedBy={capacityPolicyHintId}
+                  onChange={(routingSessionAffinityCapacityPolicy) =>
+                    onChange({
+                      routingSessionAffinityCapacityPolicy:
+                        routingSessionAffinityCapacityPolicy as VisualConfigValues['routingSessionAffinityCapacityPolicy'],
+                    })
+                  }
+                />
+              </FieldShell>
+            </FieldAnchor>
+          </FieldGrid>
+          <FieldAnchor fieldId="accountConcurrencyEnabled">
+            <ToggleRow
+              title={t('config_management.visual.sections.network.account_concurrency_enabled')}
+              description={t(
+                'config_management.visual.sections.network.account_concurrency_enabled_desc'
+              )}
+              checked={values.accountConcurrencyEnabled}
+              disabled={disabled}
+              onChange={(accountConcurrencyEnabled) => onChange({ accountConcurrencyEnabled })}
+            />
+          </FieldAnchor>
+        </FieldGroup>
 
         <FieldGrid>
           <FieldAnchor fieldId="forceModelPrefix">

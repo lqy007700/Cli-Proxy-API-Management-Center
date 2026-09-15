@@ -39,6 +39,13 @@ export interface AuthFileCooldownSnapshot {
   records: AuthFileCooldown[] | null;
 }
 
+export interface AccountConcurrencySnapshot {
+  active: number;
+  waiting: number;
+  limit: number;
+  global_waiting: number;
+}
+
 export interface AuthFileItem {
   name: string;
   type?: AuthFileType | string;
@@ -64,6 +71,10 @@ export interface AuthFileItem {
   priority?: number;
   weight?: number;
   note?: string;
+  maxConcurrency?: number;
+  maxWaiting?: number;
+  waitTimeoutMs?: number;
+  accountConcurrency?: AccountConcurrencySnapshot;
   success?: unknown;
   failed?: unknown;
   /** 归一化后的累计成功/失败计数（由 API 边界从 success/failed 生字段填充）。 */
